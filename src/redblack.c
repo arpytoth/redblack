@@ -30,7 +30,21 @@ RedBlackNode *redblack_new_node()
     node->value = 0;
 }
 
-void redblack_insert(RedBlackNode *root, int elem)
+RedBlackNode *redblack_search_parent(RedBlackNode *root, RedBlackNode *node)
 {
-    
+    if (root->elem < node->elem)
+    {
+        if (root
+    }
+}
+
+void redblack_insert_node(RedBlackTree *tree, RedBlackNode *node)
+{
+    if (tree->root == NULL)
+    {
+        tree->root = node;
+    }
+    else
+    {
+    }
 }
