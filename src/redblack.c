@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 /* 
  * THEORY
@@ -25,6 +26,7 @@ typedef struct RedBlackNode
     struct RedBlackNode *parent;
     struct RedBlackNode *left;
     struct RedBlackNode *right;
+    NodeColor color;
     int key;
 } RedBlackNode;
 
@@ -55,6 +57,115 @@ RedBlackTree *redblack_new()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+//                             UTILS                                          //
+////////////////////////////////////////////////////////////////////////////////
+
+int redblack_depth(RedBlackNode *node)
+{
+    if (node == NULL)
+    {
+        return 0;
+    }
+    else
+    {
+        int depth = 1;
+        int left = 0;
+        int right = 0;
+        
+        if (node->left != NULL)
+            left = redblack_depth(node->left);
+
+        if (node->right != NULL)
+            right = redblack_depth(node->right);
+       
+       if (left > right)
+            return depth + left;
+        else 
+            return depth + right;
+    }   
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//                             PRINT                                          //
+////////////////////////////////////////////////////////////////////////////////
+void redblack_print(RedBlackTree *tree)
+{
+    int depth = redblack_depth(tree->root);
+}
+
+
+void list_nodes(RedBlackNode **list, int *pos, RedBlackNode *node)
+{
+    (*pos)++;
+    list[*pos] = node;
+    list_n
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// ROTATIONS
+////////////////////////////////////////////////////////////////////////////////
+
+void right_rotate(RedBlackNode *node)
+{
+    /*
+     *         05                 02
+     *     02     06    =>   01        05
+     *   01  03                     03    06
+     *
+     *   In this case we right rotate by node 05.
+     */
+
+    RedBlackNode *parent = node->parent;
+    RedBlackNode *left = node->left;
+    RedBlackNode *right = left->right;
+ 
+    if (parent != NULL)
+    {
+        if (parent->left == node)
+            parent->left = left;
+        else
+            parent->right = left;
+    }
+    left->parent = parent;    
+    
+    left->right = node;
+    node->parent = left;
+
+    node->left = right;
+    right->parent = node;
+}
+
+
+void left_rotate(RedBlackNode *node)
+{ 
+    /*
+     *         02                         05
+     *   01          05       =>      02     06
+     *           03      06        01   03   
+     */
+    RedBlackNode *parent = node->parent;
+    RedBlackNode *right = node->right;
+    RedBlackNode *left = right->left;
+ 
+    if (parent != NULL)
+    {
+        if (parent->left == node)
+            parent->left = right;
+        else
+            parent->right = right;
+    }
+    right->parent = parent;    
+    
+    right->left = node;
+    node->parent = right;
+
+    node->right = left;
+    left->parent = node;
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
 // INSERT
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -67,7 +178,9 @@ RedBlackTree *redblack_new()
  * on the color of the parent:
  *
  * Case 1. The parent is Black, there's nothing more to do
- * Case 2. 
+ * Case 2. The parent is Red, so the parent now has a Red child, to ok, we need
+ *         to fix this.
+ *  Case 2a. P's simbling G is black or null.
  */
 
 void redblack_attach_node(RedBlackNode *parent, RedBlackNode *node, int left)
@@ -79,6 +192,84 @@ void redblack_attach_node(RedBlackNode *parent, RedBlackNode *node, int left)
 
     node->parent = parent;
 }
+
+RedBlackNode *grandparent(RedBlackNode *node)
+{
+    if (node != NULL && node->parent != NULL)
+        return node->parent->parent;
+    else
+        return NULL;
+}
+
+RedBlackNode *uncle(RedBlackNode *node)
+{
+    RedBlackNode *g = grandparent(node);
+    if (g == NULL)
+        return NULL;
+    if (node->parent == g->left)
+        return g->right;
+    else
+        return g->left;
+}
+
+void insert_case1(RedBlackNode *n);
+
+void insert_case4(RedBlackNode *n)
+{
+    RedBlackNode *g;
+
+    g = grandparent(n);
+    if (n == n->parent->right && n->parent == g->left)
+    {
+        //rotate_left(n->parent);
+    }
+}
+
+void insert_case3(RedBlackNode *n)
+{
+    RedBlackNode *u;
+    RedBlackNode *g;
+
+    u = uncle(n);
+    if (u != NULL && u->color == ncRED)
+    {
+        n->parent->color = ncBLACK;
+        u->color = ncBLACK;
+        g = grandparent(n);
+        g->color = ncRED;
+        insert_case1(g);
+    }
+    else
+    {
+        insert_case4(g);
+    }
+}
+
+void insert_case2(RedBlackNode *n)
+{
+    if (n->parent->color == ncBLACK)
+        return;
+    else
+        insert_case2(n);
+}
+
+void insert_case1(RedBlackNode *n)
+{
+    if (n->parent == NULL)
+        n->color = ncBLACK;
+    else
+        insert_case2(n);
+}
+
+void redblack_fix_insert5(RedBlackNode *node)
+{
+
+}
+
+void redblack_insert_fix(RedBlackNode *parent)
+{
+       
+   }
 
 void redblack_insert_node(RedBlackNode *parent, RedBlackNode *node)
 {
@@ -226,7 +417,8 @@ int main()
 {
     RedBlackTree *tree = redblack_new();
     RedBlackNode *node = NULL;
-    
+    int d;
+
     /*
      *           5
      *
@@ -252,6 +444,7 @@ int main()
         printf("Found\n");
     else
         printf("Not found\n");
-    
-    
+     
+    d = redblack_depth(tree->root);
+    printf("Depth is: %d\n", d);
 }
