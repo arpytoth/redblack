@@ -108,7 +108,6 @@ void print_node(RedBlackNode *node)
         printf(" ");
         for (i = 0; i < size; i++)
             printf("x");
-        printf(" ");
     }
     else
     {
@@ -118,7 +117,6 @@ void print_node(RedBlackNode *node)
         for (i = 0; i < size-count; i++)
             printf(" ");
         printf("%s", buffer);
-        printf(" ");
     }
 }
 
@@ -143,7 +141,7 @@ void redblack_print(RedBlackTree *tree)
             int width =  (pow2(depth - level) / 2  - 1) ;
 
             for (k = 0; k < width; k++)
-                printf("    ");  
+                printf("   ");  
         }
         else
         {
@@ -151,7 +149,7 @@ void redblack_print(RedBlackTree *tree)
             int width =  (pow2(depth + 1 - level) / 2  - 1) ;
 
             for (k = 0; k < width; k++)
-                printf("    ");  
+                printf("   ");  
 
         }
 
@@ -509,14 +507,10 @@ int main()
      */
     redblack_insert(tree, 5);
     redblack_insert(tree, 2);
-    redblack_insert(tree, -4);
+    redblack_insert(tree, 6);
+    redblack_insert(tree, 1);
     redblack_insert(tree, 3);
-    redblack_insert(tree, 12);
-    redblack_insert(tree, 9);
-    redblack_insert(tree, 21);
-    redblack_insert(tree, 19);
-    redblack_insert(tree, 25);
     
-
+    right_rotate(tree->root);
     redblack_print(tree);
 }
