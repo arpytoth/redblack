@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
 
 /* 
  * THEORY
@@ -59,6 +58,16 @@ RedBlackTree *redblack_new()
 ////////////////////////////////////////////////////////////////////////////////
 //                             UTILS                                          //
 ////////////////////////////////////////////////////////////////////////////////
+int pow2(int pow)
+{
+    int result = 1;
+    int i;
+    
+    for (i = 1; i <= pow; i++)
+        result *= 2;
+    
+    return result;
+}
 
 int redblack_depth(RedBlackNode *node)
 {
@@ -88,19 +97,89 @@ int redblack_depth(RedBlackNode *node)
 ////////////////////////////////////////////////////////////////////////////////
 //                             PRINT                                          //
 ////////////////////////////////////////////////////////////////////////////////
+
+void print_node(RedBlackNode *node)
+{
+    int size = 2;
+    int i;
+
+    if (node == NULL)
+    {
+        printf(" ");
+        for (i = 0; i < size; i++)
+            printf("x");
+        printf(" ");
+    }
+    else
+    {
+        char buffer[10];
+        int count = sprintf(buffer, "%d", node->key);
+        printf(" ");
+        for (i = 0; i < size-count; i++)
+            printf(" ");
+        printf("%s", buffer);
+        printf(" ");
+    }
+}
+
 void redblack_print(RedBlackTree *tree)
 {
+    RedBlackNode **queue;
+    int queue_pos = 0;
     int depth = redblack_depth(tree->root);
+    int queue_size = depth * pow2(depth - 1);
+    int count = 0;
+    int level = 0;
+    
+    queue = (RedBlackNode**)malloc(sizeof(RedBlackNode*) * queue_size);
+
+    queue[queue_pos++] = tree->root;
+
+    while (queue_pos != 0 && level < depth)
+    {
+        if (count == 0)
+        {
+            int k;
+            int width =  (pow2(depth - level) / 2  - 1) ;
+
+            for (k = 0; k < width; k++)
+                printf("    ");  
+        }
+        else
+        {
+            int k;
+            int width =  (pow2(depth + 1 - level) / 2  - 1) ;
+
+            for (k = 0; k < width; k++)
+                printf("    ");  
+
+        }
+
+
+        RedBlackNode *node = queue[0];
+        int i;
+        for (i = 1; i < queue_pos; i++)
+            queue[i-1] = queue[i];
+        queue_pos--;
+
+        print_node(node);
+        
+        if (node != NULL)
+        {
+            queue[queue_pos++] = node->left;
+            queue[queue_pos++] = node->right;
+        }
+        count++;
+        if (count == pow2(level))
+        {
+            level++;
+            count = 0;
+            printf("\n");
+        }
+    }
+    printf("\n");
+    free(queue);
 }
-
-
-void list_nodes(RedBlackNode **list, int *pos, RedBlackNode *node)
-{
-    (*pos)++;
-    list[*pos] = node;
-    list_n
-}
-
 
 ////////////////////////////////////////////////////////////////////////////////
 // ROTATIONS
@@ -430,7 +509,7 @@ int main()
      */
     redblack_insert(tree, 5);
     redblack_insert(tree, 2);
-    redblack_insert(tree, -1);
+    redblack_insert(tree, -4);
     redblack_insert(tree, 3);
     redblack_insert(tree, 12);
     redblack_insert(tree, 9);
@@ -438,13 +517,6 @@ int main()
     redblack_insert(tree, 19);
     redblack_insert(tree, 25);
     
-    redblack_delete(tree, 12);
-    node = redblack_search(tree, 12);
-    if (node != NULL)
-        printf("Found\n");
-    else
-        printf("Not found\n");
-     
-    d = redblack_depth(tree->root);
-    printf("Depth is: %d\n", d);
+
+    redblack_print(tree);
 }
