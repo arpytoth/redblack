@@ -167,6 +167,12 @@ void redblack_print(RedBlackTree *tree)
             queue[queue_pos++] = node->left;
             queue[queue_pos++] = node->right;
         }
+        else
+        {
+            queue[queue_pos++] = NULL;
+            queue[queue_pos++] = NULL;
+
+        }
         count++;
         if (count == pow2(level))
         {
@@ -183,7 +189,7 @@ void redblack_print(RedBlackTree *tree)
 // ROTATIONS
 ////////////////////////////////////////////////////////////////////////////////
 
-void right_rotate(RedBlackNode *node)
+void right_rotate(RedBlackNode **node)
 {
     /*
      *         05                 02
@@ -193,52 +199,65 @@ void right_rotate(RedBlackNode *node)
      *   In this case we right rotate by node 05.
      */
 
-    RedBlackNode *parent = node->parent;
-    RedBlackNode *left = node->left;
-    RedBlackNode *right = left->right;
+    RedBlackNode *parent = (*node)->parent;
+    RedBlackNode *left = (*node)->left;
+    RedBlackNode *right = NULL;
+    
+    if (left != NULL)
+        right = left->right;
  
     if (parent != NULL)
     {
-        if (parent->left == node)
+        if (parent->left == *node)
             parent->left = left;
         else
             parent->right = left;
     }
-    left->parent = parent;    
+    if (left != NULL)
+        left->parent = parent;    
     
-    left->right = node;
-    node->parent = left;
+    if (left != NULL)
+        left->right = (*node);
+    (*node)->parent = left;
 
-    node->left = right;
-    right->parent = node;
+    (*node)->left = right;
+    if (right != NULL)
+        right->parent = (*node);
+
+    (*node) = left;     
 }
 
 
-void left_rotate(RedBlackNode *node)
+void left_rotate(RedBlackNode **node)
 { 
     /*
      *         02                         05
      *   01          05       =>      02     06
      *           03      06        01   03   
      */
-    RedBlackNode *parent = node->parent;
-    RedBlackNode *right = node->right;
+    RedBlackNode *parent = (*node)->parent;
+    RedBlackNode *right = (*node)->right;
     RedBlackNode *left = right->left;
  
     if (parent != NULL)
     {
-        if (parent->left == node)
+        if (parent->left == (*node))
             parent->left = right;
         else
             parent->right = right;
     }
-    right->parent = parent;    
-    
-    right->left = node;
-    node->parent = right;
+    if (right != NULL)
+    {
+        right->parent = parent;    
+        right->left = *node;
+        (*node)->parent = right;
+    }
 
-    node->right = left;
-    left->parent = node;
+    (*node)->right = left;
+    if (left != NULL)
+        left->parent = (*node);
+
+    (*node) = right;
 }
 
 
@@ -510,7 +529,7 @@ int main()
     redblack_insert(tree, 6);
     redblack_insert(tree, 1);
     redblack_insert(tree, 3);
-    
-    right_rotate(tree->root);
+    redblack_print(tree); 
+    left_rotate(&tree->root);
     redblack_print(tree);
 }
