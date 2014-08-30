@@ -112,7 +112,11 @@ void print_node(RedBlackNode *node)
     else
     {
         char buffer[10];
-        int count = sprintf(buffer, "%d", node->key);
+        char color;
+        int count;
+        
+        color = node->color == ncRED?'R':'B';
+        count = sprintf(buffer, "%d%c", node->key, color);
         printf(" ");
         for (i = 0; i < size-count; i++)
             printf(" ");
@@ -189,7 +193,7 @@ void redblack_print(RedBlackTree *tree)
 // ROTATIONS
 ////////////////////////////////////////////////////////////////////////////////
 
-void right_rotate(RedBlackNode **node)
+void right_rotate(RedBlackTree *tree, RedBlackNode *n)
 {
     /*
      *         05                 02
@@ -199,16 +203,20 @@ void right_rotate(RedBlackNode **node)
      *   In this case we right rotate by node 05.
      */
 
-    RedBlackNode *parent = (*node)->parent;
-    RedBlackNode *left = (*node)->left;
+    RedBlackNode *parent = n->parent;
+    RedBlackNode *left = n->left;
     RedBlackNode *right = NULL;
+    int is_root = 0;
     
+    if (n == tree->root)
+        is_root = 1;
+
     if (left != NULL)
         right = left->right;
  
     if (parent != NULL)
     {
-        if (parent->left == *node)
+        if (parent->left == n)
             parent->left = left;
         else
             parent->right = left;
@@ -217,31 +225,33 @@ void right_rotate(RedBlackNode **node)
         left->parent = parent;    
     
     if (left != NULL)
-        left->right = (*node);
-    (*node)->parent = left;
+        left->right = n;
+    n->parent = left;
 
-    (*node)->left = right;
+    n->left = right;
     if (right != NULL)
-        right->parent = (*node);
+        right->parent = n;
 
-    (*node) = left;     
+    if (is_root)
+        tree->root = left;     
 }
 
 
-void left_rotate(RedBlackNode **node)
+void left_rotate(RedBlackTree *tree, RedBlackNode *n)
 { 
     /*
      *         02                         05
      *   01          05       =>      02     06
      *           03      06        01   03   
      */
-    RedBlackNode *parent = (*node)->parent;
-    RedBlackNode *right = (*node)->right;
+    RedBlackNode *parent = n->parent;
+    RedBlackNode *right = n->right;
     RedBlackNode *left = right->left;
- 
+    int is_root = (tree->root == n);
+
     if (parent != NULL)
     {
-        if (parent->left == (*node))
+        if (parent->left == n)
             parent->left = right;
         else
             parent->right = right;
@@ -249,15 +259,16 @@ void left_rotate(RedBlackNode **node)
     if (right != NULL)
     {
         right->parent = parent;    
-        right->left = *node;
-        (*node)->parent = right;
+        right->left = n;
+        n->parent = right;
     }
 
-    (*node)->right = left;
+    n->right = left;
     if (left != NULL)
-        left->parent = (*node);
+        left->parent = n;
 
-    (*node) = right;
+    if (is_root)
+        tree->root = right;
 }
 
 
@@ -308,20 +319,40 @@ RedBlackNode *uncle(RedBlackNode *node)
         return g->left;
 }
 
-void insert_case1(RedBlackNode *n);
+void insert_case1(RedBlackTree *tree, RedBlackNode *n);
 
-void insert_case4(RedBlackNode *n)
+void insert_case5(RedBlackTree *t, RedBlackNode *n)
+{
+    RedBlackNode *g;
+    g = grandparent(n);
+
+    n->parent->color = ncBLACK;
+    g->color = ncRED;
+    if (n == n->parent->left)
+        right_rotate(t, g);
+    else
+        left_rotate(t, g);
+}
+
+void insert_case4(RedBlackTree *t, RedBlackNode *n)
 {
     RedBlackNode *g;
 
     g = grandparent(n);
     if (n == n->parent->right && n->parent == g->left)
     {
-        //rotate_left(n->parent);
+        left_rotate(t, n->parent);
+        n = n->left;
     }
+    else if (n == n->parent->left && n->parent == g->right)
+    {
+        right_rotate(t, n->parent);
+        n = n->right;
+    }
+    insert_case5(t, n);
 }
 
-void insert_case3(RedBlackNode *n)
+void insert_case3(RedBlackTree *t, RedBlackNode *n)
 {
     RedBlackNode *u;
     RedBlackNode *g;
@@ -333,39 +364,30 @@ void insert_case3(RedBlackNode *n)
         u->color = ncBLACK;
         g = grandparent(n);
         g->color = ncRED;
-        insert_case1(g);
+        insert_case1(t, g);
     }
     else
     {
-        insert_case4(g);
+        insert_case4(t, n);
     }
 }
 
-void insert_case2(RedBlackNode *n)
+void insert_case2(RedBlackTree *tree, RedBlackNode *n)
 {
     if (n->parent->color == ncBLACK)
         return;
     else
-        insert_case2(n);
+        insert_case3(tree, n);
 }
 
-void insert_case1(RedBlackNode *n)
+void insert_case1(RedBlackTree *tree, RedBlackNode *n)
 {
     if (n->parent == NULL)
         n->color = ncBLACK;
     else
-        insert_case2(n);
+        insert_case2(tree, n);
 }
 
-void redblack_fix_insert5(RedBlackNode *node)
-{
-
-}
-
-void redblack_insert_fix(RedBlackNode *parent)
-{
-       
-   }
 
 void redblack_insert_node(RedBlackNode *parent, RedBlackNode *node)
 {
@@ -403,6 +425,7 @@ void redblack_insert(RedBlackTree *tree, int key)
     {
         redblack_insert_node(tree->root, node);
     }
+    insert_case1(tree, node);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -525,11 +548,10 @@ int main()
      *                  19    25
      */
     redblack_insert(tree, 5);
-    redblack_insert(tree, 2);
+    redblack_insert(tree, 4);
     redblack_insert(tree, 6);
-    redblack_insert(tree, 1);
     redblack_insert(tree, 3);
+    redblack_insert(tree, 2);
+    redblack_insert(tree, 1);
     redblack_print(tree); 
-    left_rotate(&tree->root);
-    redblack_print(tree);
 }
