@@ -1,20 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
-/* 
- * THEORY
- * -------
- *
- * A red-black tree is a binary tree where each node has a color and the
- * following attributes are true:
- *
- * 1) The root is black.
- * 2) All leaves are black.
- * 3) Both children of each red node are black
- * 4) The path from each leaf up to the root contain the same number of black
- *    nodes.
- *
- */
+#include "redblack.h"
+
+////////////////////////////////////////////////////////////////////////////////
+//                            INTERNAL STUFF                                  //
+////////////////////////////////////////////////////////////////////////////////
+
 typedef enum NodeColor
 {
     ncRED, ncBLACK
@@ -26,15 +19,9 @@ typedef struct RedBlackNode
     struct RedBlackNode *left;
     struct RedBlackNode *right;
     NodeColor color;
-    int key;
-    int value;
+    void *key;
+    void *value;
 } RedBlackNode;
-
-typedef struct RedBlackTree
-{
-    struct RedBlackNode *root;
-    struct RedBlackNode *nil;
-} RedBlackTree;
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -51,22 +38,23 @@ RedBlackNode *redblack_new_node()
     node->key = 0;
 }
 
-RedBlackTree *redblack_new()
+RedBlackTree *rb_new(int (*compare)(void *, void *), 
+    void (*freekey)(void *), int (*print)(char *, void*))
 {
     RedBlackTree *tree;
 
     tree = (RedBlackTree*)malloc(sizeof(RedBlackTree));
-    tree->nil = redblack_new_node();
-    tree->nil->color = ncBLACK;
-    tree->nil->left = tree->nil;
-    tree->nil->right = tree->nil;
-    tree->nil->parent = tree->nil;
+    tree->root = NULL;
+    tree->compare = compare;
+    tree->print = print;
+    tree->free = freekey;
     return tree;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 //                                   UTILS                                    //
 ////////////////////////////////////////////////////////////////////////////////
+
 RedBlackNode *successor(RedBlackNode *n)
 {
     if (n == NULL)
@@ -92,8 +80,6 @@ RedBlackNode *successor(RedBlackNode *n)
         return s;
     }
 }
-
-
 
 void set_color(RedBlackNode *p, NodeColor color)
 {
@@ -159,105 +145,6 @@ int redblack_depth(RedBlackNode *node)
             return depth + right;
     }   
 }
-
-////////////////////////////////////////////////////////////////////////////////
-//                             PRINT                                          //
-////////////////////////////////////////////////////////////////////////////////
-
-void print_node(RedBlackNode *node)
-{
-    int size = 2;
-    int i;
-
-    if (node == NULL)
-    {
-        printf(" ");
-        for (i = 0; i < size; i++)
-            printf("x");
-    }
-    else
-    {
-        char buffer[10];
-        char color;
-        int count;
-        
-        color = node->color == ncRED?'R':'B';
-        count = sprintf(buffer, "%d%c", node->key, color);
-        printf(" ");
-        for (i = 0; i < size-count; i++)
-            printf(" ");
-        printf("%s", buffer);
-    }
-}
-
-void redblack_print(RedBlackTree *tree)
-{
-    RedBlackNode **queue;
-    int queue_pos = 0;
-    int depth = redblack_depth(tree->root);
-    int queue_size = depth * pow2(depth - 1);
-    int count = 0;
-    int level = 0;
-    
-    queue = (RedBlackNode**)malloc(sizeof(RedBlackNode*) * queue_size);
-
-    queue[queue_pos++] = tree->root;
-
-    while (queue_pos != 0 && level < depth)
-    {
-        if (count == 0)
-        {
-            int k;
-            int width =  (pow2(depth - level) / 2  - 1) ;
-
-            for (k = 0; k < width; k++)
-                printf("   ");  
-        }
-        else
-        {
-            int k;
-            int width =  (pow2(depth + 1 - level) / 2  - 1) ;
-
-            for (k = 0; k < width; k++)
-                printf("   ");  
-
-        }
-
-
-        RedBlackNode *node = queue[0];
-        int i;
-        for (i = 1; i < queue_pos; i++)
-            queue[i-1] = queue[i];
-        queue_pos--;
-
-        print_node(node);
-        
-        if (node != NULL)
-        {
-            queue[queue_pos++] = node->left;
-            queue[queue_pos++] = node->right;
-        }
-        else
-        {
-            queue[queue_pos++] = NULL;
-            queue[queue_pos++] = NULL;
-
-        }
-        count++;
-        if (count == pow2(level))
-        {
-            level++;
-            count = 0;
-            printf("\n");
-        }
-    }
-    printf("\n");
-    free(queue);
-}
-
-////////////////////////////////////////////////////////////////////////////////
-//                                 ROTATIONS                                  //
-////////////////////////////////////////////////////////////////////////////////
 
 void right_rotate(RedBlackTree *tree, RedBlackNode *p)
 {
@@ -365,7 +252,7 @@ void fix_after_insert(RedBlackTree *tree, RedBlackNode *x)
     tree->root->color = ncBLACK;
 }
 
-void redblack_insert(RedBlackTree *tree, int key)
+void rb_insert(RedBlackTree *tree, void *key, void *value)
 {
     RedBlackNode *t = tree->root;
    
@@ -374,6 +261,7 @@ void redblack_insert(RedBlackTree *tree, int key)
         RedBlackNode *node;
         node = redblack_new_node();
         node->key = key;
+        node->value = value;
 
         tree->root = node;
         node->color = ncBLACK;
@@ -387,10 +275,10 @@ void redblack_insert(RedBlackTree *tree, int key)
         do
         {
             parent = t;
-
-            if (key < parent->key)
+            cmp = tree->compare(key, parent->key);
+            if (cmp < 0)
                 t = t->left;
-            else if (key > parent->key)
+            else if (cmp > 0)
                 t = t->right;
             else
                 return;
@@ -398,7 +286,8 @@ void redblack_insert(RedBlackTree *tree, int key)
         
         e = redblack_new_node();
         e->key = key;
-        if (key < parent->key)
+        e->value = value;
+        if (cmp < 0)
             parent->left = e;
         else
             parent->right = e;
@@ -408,24 +297,32 @@ void redblack_insert(RedBlackTree *tree, int key)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// SEARCH
+//                                 SEARCH                                     //
 ////////////////////////////////////////////////////////////////////////////////
 
-RedBlackNode *redblack_search_node(RedBlackNode *parent, int key)
+RedBlackNode *search_node(RedBlackTree *tree, void *key)
 {
-    if (parent == NULL)
-        return NULL;
-    else if (key < parent->key)
-        return redblack_search_node(parent->left, key);
-    else if (parent->key == key)
-        return parent;
-    else
-        return redblack_search_node(parent->right, key);
+    RedBlackNode *p = tree->root;
+    while (p != NULL)
+    {
+        int cmp = tree->compare(key, p->key);
+        if (cmp < 0)
+            p = p->left;
+        else if (cmp > 0)
+            p = p->right;
+        else
+            return p;
+    }
+    return NULL;
 }
 
-RedBlackNode *redblack_search(RedBlackTree *tree, int key)
+void *rb_search(RedBlackTree *tree, void *key)
 {
-    return redblack_search_node(tree->root, key);
+    RedBlackNode *node = search_node(tree, key);
+    if (node != NULL)
+        return node->value;
+    else
+        return NULL;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -518,8 +415,6 @@ void redblack_delete_node(RedBlackTree *tree, RedBlackNode *p)
 {
     RedBlackNode *r;
 
-    printf("delete p: %d\n", p->key);
-
     // Case1. The node to delete has exactly two children. In this case we do
     //        a simple relabeling with the successor and delete de successor 
     //        that will have at most one child.
@@ -527,9 +422,7 @@ void redblack_delete_node(RedBlackTree *tree, RedBlackNode *p)
     {
         RedBlackNode *s = successor(p);
         p->key = s->key;
-        // TODO exchange values;
-
-        printf("successor: %d\n", s->key);
+        p->value = s->value;
         p = s;
     }
 
@@ -576,15 +469,215 @@ void redblack_delete_node(RedBlackTree *tree, RedBlackNode *p)
     }
 }
 
-void redblack_delete(RedBlackTree *tree, int key)
+void *rb_delete(RedBlackTree *tree, void *key)
 {
     RedBlackNode *node_to_del;
-
-    node_to_del = redblack_search(tree, key);
+    node_to_del = search_node(tree, key);
     if (node_to_del != NULL)
     {
+        void *value = node_to_del->value;
+        tree->free(node_to_del->key);
         redblack_delete_node(tree, node_to_del);
+        return value;
     }
+    else
+    {
+        return NULL;
+    }
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+//                             PRINT                                          //
+////////////////////////////////////////////////////////////////////////////////
+
+void print_node(RedBlackTree *tree, RedBlackNode *node)
+{
+    int size = 2;
+    int i;
+
+    if (node == NULL)
+    {
+        printf(" ");
+        for (i = 0; i < size; i++)
+            printf("x");
+    }
+    else
+    {
+        char buffer[20];
+        char color;
+        int count;
+        
+        color = node->color == ncRED?'R':'B';
+        count = tree->print(buffer, node->key);
+        count++;
+        printf(" ");
+        for (i = 0; i < size-count; i++)
+            printf(" ");
+        printf("%s", buffer);
+        printf("%c", color);
+    }
+}
+
+void rb_print(RedBlackTree *tree)
+{
+    RedBlackNode **queue;
+    int queue_pos = 0;
+    int depth = redblack_depth(tree->root);
+    int queue_size = depth * pow2(depth - 1);
+    int count = 0;
+    int level = 0;
+    
+    queue = (RedBlackNode**)malloc(sizeof(RedBlackNode*) * queue_size);
+
+    queue[queue_pos++] = tree->root;
+
+    while (queue_pos != 0 && level < depth)
+    {
+        if (count == 0)
+        {
+            int k;
+            int width =  (pow2(depth - level) / 2  - 1) ;
+
+            for (k = 0; k < width; k++)
+                printf("   ");  
+        }
+        else
+        {
+            int k;
+            int width =  (pow2(depth + 1 - level) / 2  - 1) ;
+
+            for (k = 0; k < width; k++)
+                printf("   ");  
+
+        }
+
+
+        RedBlackNode *node = queue[0];
+        int i;
+        for (i = 1; i < queue_pos; i++)
+            queue[i-1] = queue[i];
+        queue_pos--;
+
+        print_node(tree, node);
+        
+        if (node != NULL)
+        {
+            queue[queue_pos++] = node->left;
+            queue[queue_pos++] = node->right;
+        }
+        else
+        {
+            queue[queue_pos++] = NULL;
+            queue[queue_pos++] = NULL;
+
+        }
+        count++;
+        if (count == pow2(level))
+        {
+            level++;
+            count = 0;
+            printf("\n");
+        }
+    }
+    printf("\n");
+    free(queue);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//                            INT RED-BLACK TREE                              //
+////////////////////////////////////////////////////////////////////////////////               
+int compare_int(void *a, void *b)
+{
+    int *i = (int *)a;
+    int *j = (int *)b;
+    if (*i < *j)
+        return -1;
+    else if (*i == *j)
+        return 0;
+    else
+        return 1;
+}
+
+int print_int(char *buffer, void *a)
+{
+    int *i = (int *)a;
+    return sprintf(buffer, "%d", *i);
+}
+
+void free_int(void *a)
+{
+    int  *i = (int *)a;
+    free(i);
+}
+
+RedBlackTree *irb_new()
+{
+    RedBlackTree *tree = rb_new(&compare_int, &free_int, &print_int);
+    return tree;
+}
+void irb_insert(RedBlackTree *tree, int key, void *value)
+{
+    int *pkey = (int*)malloc(sizeof(int));
+    *pkey = key;
+    rb_insert(tree, pkey, value);
+}
+
+void *irb_search(RedBlackTree *tree, int key)
+{
+    void *value = rb_search(tree, &key);
+    return value;
+}
+
+void *irb_delete(RedBlackTree *tree, int key)
+{
+    void *value = rb_delete(tree, &key);
+    return value;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//                           STRING RED-BLACK TREE                            //
+////////////////////////////////////////////////////////////////////////////////               
+
+int compare_string(void *a, void *b)
+{
+    char *i = (char *)a;
+    char *j = (char *)b;
+    return strcmp(i, j);
+}
+
+int print_string(char *buffer, void *a)
+{
+    char *i = (char *)a;
+    return sprintf(buffer, "%s", i);
+}
+
+void free_string(void *a)
+{
+    char  *i = (char *)a;
+    free(i);
+}
+
+RedBlackTree *srb_new()
+{
+    RedBlackTree *tree = rb_new(&compare_string, &free_string, &print_string);
+    return tree;
+}
+
+void  srb_insert(RedBlackTree *tree, const char *key, void *value)
+{
+    char *pkey = strdup(key);
+    rb_insert(tree, pkey, value);
+}
+
+void *srb_search(RedBlackTree *tree, char *key)
+{
+    return rb_search(tree, key);
+}
+
+void *srb_delete(RedBlackTree *tree, char *key)
+{
+    return rb_delete(tree, key);
 }
 
 
@@ -595,25 +688,18 @@ void redblack_delete(RedBlackTree *tree, int key)
 
 int main()
 {
-    RedBlackTree *tree = redblack_new();
-    RedBlackNode *node = NULL;
-    int d;
+    void *value;
+    RedBlackTree *tree = srb_new();
+    srb_insert(tree, "AR", NULL);
+    srb_insert(tree, "BH", NULL);
+    srb_insert(tree, "CR", NULL);
+    srb_insert(tree, "MK", NULL);
+    srb_insert(tree, "U", NULL);
+    srb_insert(tree, "T", NULL);
+    
+    value = srb_delete(tree, "MK");
+    if (value != NULL)
+        free(value);
 
-    /*
-     *           5
-     *
-     *       2        12
-     *    
-     *  -4      3    9     21
-     *
-     *                  19    25
-     */
-    redblack_insert(tree, 5);
-    redblack_insert(tree, 4);
-    redblack_insert(tree, 6);
-    redblack_insert(tree, 3);
-    redblack_insert(tree, 2);
-    redblack_insert(tree, 1);
-    redblack_delete(tree, 6);
-    redblack_print(tree); 
+    rb_print(tree);
 }
