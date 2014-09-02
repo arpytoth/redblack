@@ -5,16 +5,16 @@
  * THEORY
  * -------
  *
- * A red-black tree is a binary tree in which:
- * -> each node has a color (red or black) associated with it
- * -> the following 3 properties hold:
- *    1. The root of the tree is black
- *    2. The children of a red node are black
- *    3. For each node with at least one null child, the number of black nodes
- *       on the path from the root to the null child is the same.
+ * A red-black tree is a binary tree where each node has a color and the
+ * following attributes are true:
+ *
+ * 1) The root is black.
+ * 2) All leaves are black.
+ * 3) Both children of each red node are black
+ * 4) The path from each leaf up to the root contain the same number of black
+ *    nodes.
  *
  */
-
 typedef enum NodeColor
 {
     ncRED, ncBLACK
@@ -27,6 +27,7 @@ typedef struct RedBlackNode
     struct RedBlackNode *right;
     NodeColor color;
     int key;
+    int value;
 } RedBlackNode;
 
 typedef struct RedBlackTree
@@ -35,6 +36,10 @@ typedef struct RedBlackTree
     struct RedBlackNode *nil;
 } RedBlackTree;
 
+
+////////////////////////////////////////////////////////////////////////////////
+//                       CONSTRUCTORS AND DESTRUCTORS                         //
+////////////////////////////////////////////////////////////////////////////////
 
 RedBlackNode *redblack_new_node()
 {
@@ -51,13 +56,74 @@ RedBlackTree *redblack_new()
     RedBlackTree *tree;
 
     tree = (RedBlackTree*)malloc(sizeof(RedBlackTree));
-    tree->root = NULL;
+    tree->nil = redblack_new_node();
+    tree->nil->color = ncBLACK;
+    tree->nil->left = tree->nil;
+    tree->nil->right = tree->nil;
+    tree->nil->parent = tree->nil;
     return tree;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-//                             UTILS                                          //
+//                                   UTILS                                    //
 ////////////////////////////////////////////////////////////////////////////////
+RedBlackNode *successor(RedBlackNode *n)
+{
+    if (n == NULL)
+    {
+        return NULL;
+    }
+    else if (n->right != NULL)
+    {
+        RedBlackNode *s = n->right;
+        while (s->left != NULL)
+            s = s->left;
+        return s;
+    }
+    else
+    {
+        RedBlackNode *s = n->parent;
+        RedBlackNode *ch = n;
+        while (s != NULL && ch == s->right)
+        {
+            ch = s;
+            s = s->parent;
+        }
+        return s;
+    }
+}
+
+
+
+void set_color(RedBlackNode *p, NodeColor color)
+{
+    if (p != NULL)
+        p->color = color;
+}
+
+NodeColor color_of(RedBlackNode *p)
+{
+    if (p == NULL)
+        return ncBLACK;
+    else
+        return p->color;
+}
+
+RedBlackNode *parent_of(RedBlackNode *p)
+{
+    return (p == NULL) ? NULL : p->parent;
+}
+
+RedBlackNode *left_of(RedBlackNode *p)
+{
+    return (p == NULL) ? NULL : p->left;
+}
+
+RedBlackNode *right_of(RedBlackNode *p)
+{
+    return (p == NULL) ? NULL : p->right;
+}
+
 int pow2(int pow)
 {
     int result = 1;
@@ -190,242 +256,155 @@ void redblack_print(RedBlackTree *tree)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// ROTATIONS
+//                                 ROTATIONS                                  //
 ////////////////////////////////////////////////////////////////////////////////
 
-void right_rotate(RedBlackTree *tree, RedBlackNode *n)
+void right_rotate(RedBlackTree *tree, RedBlackNode *p)
+{
+    if (p != NULL)
+    {
+        RedBlackNode *l = p->left;
+        p->left= l->right;
+        if (l->right != NULL)
+            l->right->parent = p;
+        l->parent = p->parent;
+        if (p->parent == NULL)
+            tree->root = l;
+        else if (p->parent->right == p)
+            p->parent->right = l;
+        else
+            p->parent->left = l;
+
+        l->right = p;
+        p->parent = l;
+    }
+}
+
+
+void left_rotate(RedBlackTree *tree, RedBlackNode *p)
+{
+    if (p != NULL)
+    {
+        RedBlackNode *r = p->right;
+        p->right = r->left;
+        if (r->left != NULL)
+            r->left->parent = p;
+        r->parent = p->parent;
+        if (p->parent == NULL)
+            tree->root = r;
+        else if (p->parent->left == p)
+            p->parent->left = r;
+        else
+            p->parent->right = r;
+
+        r->left = p;
+        p->parent = r;
+    }
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+//                                   INSERT                                   //
+////////////////////////////////////////////////////////////////////////////////
+
+
+void fix_after_insert(RedBlackTree *tree, RedBlackNode *x)
 {
     /*
-     *         05                 02
-     *     02     06    =>   01        05
-     *   01  03                     03    06
-     *
-     *   In this case we right rotate by node 05.
+     * Algorithm from CLR.
      */
 
-    RedBlackNode *parent = n->parent;
-    RedBlackNode *left = n->left;
-    RedBlackNode *right = NULL;
-    int is_root = 0;
-    
-    if (n == tree->root)
-        is_root = 1;
-
-    if (left != NULL)
-        right = left->right;
- 
-    if (parent != NULL)
+    x->color = ncRED;
+    while (x != NULL && x != tree->root && x->parent->color == ncRED)
     {
-        if (parent->left == n)
-            parent->left = left;
+        if (parent_of(x) == left_of(parent_of(parent_of(x))))
+        {
+            RedBlackNode *y = right_of(parent_of(parent_of(x)));
+            if (color_of(y) == ncRED) 
+            {
+                set_color(parent_of(x), ncBLACK);
+                set_color(y, ncBLACK);
+                set_color(parent_of(parent_of(x)), ncRED);
+                x = parent_of(parent_of(x));
+            }
+            else
+            {
+                if (x == right_of(parent_of(x)))
+                {
+                    x = parent_of(x);
+                    left_rotate(tree, x);
+                }
+                set_color(parent_of(x), ncBLACK);
+                set_color(parent_of(parent_of(x)), ncRED);
+                right_rotate(tree, parent_of(parent_of(x)));
+            }
+        }
         else
-            parent->right = left;
-    }
-    if (left != NULL)
-        left->parent = parent;    
-    
-    if (left != NULL)
-        left->right = n;
-    n->parent = left;
-
-    n->left = right;
-    if (right != NULL)
-        right->parent = n;
-
-    if (is_root)
-        tree->root = left;     
-}
-
-
-void left_rotate(RedBlackTree *tree, RedBlackNode *n)
-{ 
-    /*
-     *         02                         05
-     *   01          05       =>      02     06
-     *           03      06        01   03   
-     */
-    RedBlackNode *parent = n->parent;
-    RedBlackNode *right = n->right;
-    RedBlackNode *left = right->left;
-    int is_root = (tree->root == n);
-
-    if (parent != NULL)
-    {
-        if (parent->left == n)
-            parent->left = right;
-        else
-            parent->right = right;
-    }
-    if (right != NULL)
-    {
-        right->parent = parent;    
-        right->left = n;
-        n->parent = right;
-    }
-
-    n->right = left;
-    if (left != NULL)
-        left->parent = n;
-
-    if (is_root)
-        tree->root = right;
-}
-
-
-////////////////////////////////////////////////////////////////////////////////
-// INSERT
-////////////////////////////////////////////////////////////////////////////////
-
-/*
- * 1. use the Binary Search Tree insert algorithm to add the new node
- * 2. color the node to red
- * 3. restore red-black tree properties if necessary.
- *
- * For step 3 for inserting into a non-empty tree, what we need to do depends
- * on the color of the parent:
- *
- * Case 1. The parent is Black, there's nothing more to do
- * Case 2. The parent is Red, so the parent now has a Red child, to ok, we need
- *         to fix this.
- *  Case 2a. P's simbling G is black or null.
- */
-
-void redblack_attach_node(RedBlackNode *parent, RedBlackNode *node, int left)
-{
-    if (left == 1)
-        parent->left = node;
-    else
-        parent->right = node;
-
-    node->parent = parent;
-}
-
-RedBlackNode *grandparent(RedBlackNode *node)
-{
-    if (node != NULL && node->parent != NULL)
-        return node->parent->parent;
-    else
-        return NULL;
-}
-
-RedBlackNode *uncle(RedBlackNode *node)
-{
-    RedBlackNode *g = grandparent(node);
-    if (g == NULL)
-        return NULL;
-    if (node->parent == g->left)
-        return g->right;
-    else
-        return g->left;
-}
-
-void insert_case1(RedBlackTree *tree, RedBlackNode *n);
-
-void insert_case5(RedBlackTree *t, RedBlackNode *n)
-{
-    RedBlackNode *g;
-    g = grandparent(n);
-
-    n->parent->color = ncBLACK;
-    g->color = ncRED;
-    if (n == n->parent->left)
-        right_rotate(t, g);
-    else
-        left_rotate(t, g);
-}
-
-void insert_case4(RedBlackTree *t, RedBlackNode *n)
-{
-    RedBlackNode *g;
-
-    g = grandparent(n);
-    if (n == n->parent->right && n->parent == g->left)
-    {
-        left_rotate(t, n->parent);
-        n = n->left;
-    }
-    else if (n == n->parent->left && n->parent == g->right)
-    {
-        right_rotate(t, n->parent);
-        n = n->right;
-    }
-    insert_case5(t, n);
-}
-
-void insert_case3(RedBlackTree *t, RedBlackNode *n)
-{
-    RedBlackNode *u;
-    RedBlackNode *g;
-
-    u = uncle(n);
-    if (u != NULL && u->color == ncRED)
-    {
-        n->parent->color = ncBLACK;
-        u->color = ncBLACK;
-        g = grandparent(n);
-        g->color = ncRED;
-        insert_case1(t, g);
-    }
-    else
-    {
-        insert_case4(t, n);
-    }
-}
-
-void insert_case2(RedBlackTree *tree, RedBlackNode *n)
-{
-    if (n->parent->color == ncBLACK)
-        return;
-    else
-        insert_case3(tree, n);
-}
-
-void insert_case1(RedBlackTree *tree, RedBlackNode *n)
-{
-    if (n->parent == NULL)
-        n->color = ncBLACK;
-    else
-        insert_case2(tree, n);
-}
-
-
-void redblack_insert_node(RedBlackNode *parent, RedBlackNode *node)
-{
-
-    if (node->key < parent->key)
-    {
-        if (parent->left == NULL)
-            redblack_attach_node(parent, node, 1);
-        else
-            redblack_insert_node(parent->left, node);
-    }
-    else if (!(parent->key == node->key))
-    {
-        if (parent->right == NULL)
-            redblack_attach_node(parent, node, 0);
-        else
-            redblack_insert_node(parent->right, node);
-    }
+        {
+            RedBlackNode *y = left_of(parent_of(parent_of(x)));
+            if (color_of(y) == ncRED) 
+            {
+                set_color(parent_of(x), ncBLACK);
+                set_color(y, ncBLACK);
+                set_color(parent_of(parent_of(x)), ncRED);
+                x = parent_of(parent_of(x));
+            }
+            else
+            {
+                if (x == left_of(parent_of(x)))
+                {
+                    x = parent_of(x);
+                    right_rotate(tree, x);
+                }
+                set_color(parent_of(x), ncBLACK);
+                set_color(parent_of(parent_of(x)), ncRED);
+                left_rotate(tree, parent_of(parent_of(x)));
+            }
+        }
+    }   
+    tree->root->color = ncBLACK;
 }
 
 void redblack_insert(RedBlackTree *tree, int key)
 {
-    RedBlackNode *node;
-
-    node = redblack_new_node();
-    node->key = key;
+    RedBlackNode *t = tree->root;
+   
     if (tree->root == NULL)
-    {
-        // Case1. The current node is at the root of the tree. In this case we
-        //        repaint the node to black. 
+    { 
+        RedBlackNode *node;
+        node = redblack_new_node();
+        node->key = key;
+
         tree->root = node;
-        node->color = ncRED;
+        node->color = ncBLACK;
     }
     else
     {
-        redblack_insert_node(tree->root, node);
+        int cmp;
+        RedBlackNode *parent;
+        RedBlackNode *e;
+
+        do
+        {
+            parent = t;
+
+            if (key < parent->key)
+                t = t->left;
+            else if (key > parent->key)
+                t = t->right;
+            else
+                return;
+        } while (t != NULL);
+        
+        e = redblack_new_node();
+        e->key = key;
+        if (key < parent->key)
+            parent->left = e;
+        else
+            parent->right = e;
+        e->parent = parent;
+        fix_after_insert(tree, e);
     }
-    insert_case1(tree, node);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -453,57 +432,147 @@ RedBlackNode *redblack_search(RedBlackTree *tree, int key)
 ///                                DELETE                                     //
 ////////////////////////////////////////////////////////////////////////////////
 
-RedBlackNode *redblack_find_min(RedBlackNode *root)
-{
-    if (root->left == NULL)
-        return root;
-    else
-        return redblack_find_min(root->left);
+void fix_after_delete(RedBlackTree *tree, RedBlackNode *x)
+{   
+    /*
+     * Algorithm found in CLR.
+     */
+
+    while (x != tree->root && x->color == ncBLACK)
+    {
+        if (x == left_of(parent_of(x)))
+        {
+            RedBlackNode *s = right_of(parent_of(x));
+            if (color_of(s) == ncRED)
+            {
+                set_color(s, ncBLACK);
+                set_color(parent_of(x), ncRED);
+                left_rotate(tree, parent_of(x));
+                s = right_of(parent_of(x));
+            }
+            
+            if (color_of(left_of(s)) == ncBLACK &&
+                color_of(right_of(s)) == ncBLACK) 
+            {
+                set_color(s, ncRED);
+                x = parent_of(x);
+            }
+            else
+            {
+                if (color_of(right_of(s)) == ncBLACK)
+                {
+                    set_color(left_of(s), ncBLACK);
+                    set_color(s, ncRED);
+                    right_rotate(tree, s);
+                    s = right_of(parent_of(x));
+                }
+
+                set_color(s, color_of(parent_of(x)));
+                set_color(parent_of(x), ncBLACK);
+                set_color(right_of(s), ncBLACK);
+                left_rotate(tree, parent_of(x));
+                x = tree->root;
+            }
+
+        }
+        else // symetric
+        {
+            RedBlackNode *sib = left_of(parent_of(x));
+            if (color_of(sib) == ncRED)
+            {
+                set_color(sib, ncBLACK);
+                set_color(parent_of(x), ncRED);
+                right_rotate(tree, parent_of(x));
+                sib = left_of(parent_of(x));
+            }
+
+            if (color_of(right_of(sib)) == ncBLACK &&
+                color_of(left_of(sib)) == ncBLACK)
+            {
+                set_color(sib, ncRED);
+                x = parent_of(x);
+            }
+            else
+            {
+                if (color_of(left_of(sib)) == ncBLACK) 
+                {
+                    set_color(right_of(sib), ncBLACK);
+                    set_color(sib, ncRED);
+                    left_rotate(tree, sib);
+                    sib = left_of(parent_of(x));
+                }
+
+                set_color(sib, color_of(parent_of(x)));
+                set_color(parent_of(x), ncBLACK);
+                set_color(left_of(sib), ncBLACK);
+                right_rotate(tree, parent_of(x));
+                x = tree->root;
+            }
+        }
+    }
+
+    set_color(x, ncBLACK);
 }
 
-void redblack_delete_node(RedBlackNode *node)
+void redblack_delete_node(RedBlackTree *tree, RedBlackNode *p)
 {
-    // We have 3 cases to consider:
+    RedBlackNode *r;
 
-    if (node->left == NULL && node->right == NULL)
+    printf("delete p: %d\n", p->key);
+
+    // Case1. The node to delete has exactly two children. In this case we do
+    //        a simple relabeling with the successor and delete de successor 
+    //        that will have at most one child.
+    if (p->left != NULL && p->right != NULL)
     {
-        // 1. Node to be removed has no children, simply remove the node.
-        RedBlackNode *parent = node->parent;
-        if (parent->left == node)
-            parent->left = NULL;
-        else
-            parent->right = NULL;
-        free(node);
+        RedBlackNode *s = successor(p);
+        p->key = s->key;
+        // TODO exchange values;
+
+        printf("successor: %d\n", s->key);
+        p = s;
     }
-    else if (node->left == NULL || node->right == NULL)
+
+    // Start fixup at replacement node, if it exists.
+    r = (p->left != NULL ? p->left : p->right);
+    if (r != NULL)
     {
-        // 2. Node has one child, link the child to the parent of the node
-        // to be deleted, and free the node.
-        RedBlackNode *parent = node->parent;
-        RedBlackNode *child = node->left;
-        
-        if (child == NULL)
-            child = node->right;
-
-        if (parent->left == node)
-            parent->left = child;
+        // link the replacement to parent
+        r->parent = p->parent;
+        if (p->parent == NULL)
+            tree->root = r;
+        else if (p == p->parent->left)
+            p->parent->left = r;
         else
-            parent->right = child;
+            p->parent->right = r;
 
-        free(node);
+        // NULL out links so they are OK to use by fix_after_delete.
+        p->left = p->right = p->parent = NULL;
+        
+        if (p->color == ncBLACK)
+            fix_after_delete(tree, r);
+        free(p);
+    }
+    else if (p->parent == NULL)
+    {
+        // return if we are the only node.
+        tree->root = NULL;
     }
     else
     {
-        // 3. Node to be removed has two children. Find the minimum element
-        // in the right subtree of the node to be removed, replace the node
-        // value with the minimum value, and remove the minimum value, that is
-        // a leaf, so we do this recursively.
-       
-        RedBlackNode *min = redblack_find_min(node->right);
-        printf("Right is: %d\n", node->right->key);
-        printf("Minimum is: %d\n", min->key);
-        node->key = min->key;
-        redblack_delete_node(min);
+        // No children? Use self as phantom replacement and unlink.
+        if (p->color == ncBLACK)
+            fix_after_delete(tree, p);
+
+        if (p->parent != NULL)
+        {
+            if (p == p->parent->left)
+                p->parent->left = NULL;
+            else
+                p->parent->right = NULL;
+            p->parent = NULL;
+        }
+        free(p);
     }
 }
 
@@ -514,15 +583,7 @@ void redblack_delete(RedBlackTree *tree, int key)
     node_to_del = redblack_search(tree, key);
     if (node_to_del != NULL)
     {
-        if (node_to_del->parent == NULL)
-        {
-            free(node_to_del);
-            tree->root = NULL;
-        }
-        else
-        {
-            redblack_delete_node(node_to_del);
-        }
+        redblack_delete_node(tree, node_to_del);
     }
 }
 
@@ -553,5 +614,6 @@ int main()
     redblack_insert(tree, 3);
     redblack_insert(tree, 2);
     redblack_insert(tree, 1);
+    redblack_delete(tree, 6);
     redblack_print(tree); 
 }
